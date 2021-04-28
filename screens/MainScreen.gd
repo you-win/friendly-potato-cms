@@ -1,9 +1,17 @@
 extends Node2D
 
+signal toggle_selected(toggle_name)
+
 const VERTICAL_LABEL_INPUT: Resource = preload("res://screens/ui-elements/VerticalLabelInput.tscn")
 
 const INPUT_TYPE_RAW: String = "Raw"
 const INPUT_TYPE_STRUCTURED: String = "Structured"
+
+const RAW_TOGGLE: String = "RawToggle"
+const SELECT_TOGGLE: String = "SelectToggle"
+const INSERT_TOGGLE: String = "InsertToggle"
+const UPDATE_TOGGLE: String = "UpdateToggle"
+const DELETE_TOGGLE: String = "DeleteToggle"
 
 const INPUT_HISTORY_MAX: int = 100
 
@@ -28,7 +36,12 @@ var _last_query_result: Array = []
 # Control nodes
 onready var query_results: ItemList = find_node("QueryResults")
 
-onready var input_type_button: OptionButton = find_node("InputTypeButton")
+onready var raw_toggle: Toggle = find_node("RawToggle")
+onready var select_toggle: Toggle = find_node("SelectToggle")
+onready var insert_toggle: Toggle = find_node("InsertToggle")
+onready var update_toggle: Toggle = find_node("UpdateToggle")
+onready var delete_toggle: Toggle = find_node("DeleteToggle")
+
 onready var raw_input_text_edit: TextEdit = find_node("RawInputTextEdit")
 onready var structured_container: HBoxContainer = find_node("StructuredContainer")
 onready var input_button: Button = find_node("InputButton")
@@ -47,7 +60,18 @@ var _structured_input_history: Array = Array()
 ###############################################################################
 
 func _ready() -> void:
-	input_type_button.connect("item_selected", self, "_on_item_selected")
+	self.connect("toggle_selected", raw_toggle, "_on_toggle_selected")
+	self.connect("toggle_selected", select_toggle, "_on_toggle_selected")
+	self.connect("toggle_selected", insert_toggle, "_on_toggle_selected")
+	self.connect("toggle_selected", update_toggle, "_on_toggle_selected")
+	self.connect("toggle_selected", delete_toggle, "_on_toggle_selected")
+	
+	raw_toggle.connect("self_pressed", self, "_on_toggle_pressed")
+	select_toggle.connect("self_pressed", self, "_on_toggle_pressed")
+	insert_toggle.connect("self_pressed", self, "_on_toggle_pressed")
+	update_toggle.connect("self_pressed", self, "_on_toggle_pressed")
+	delete_toggle.connect("self_pressed", self, "_on_toggle_pressed")
+	
 	input_button.connect("pressed", self, "_on_input_button_pressed")
 	
 	if not OS.is_debug_build():
@@ -84,15 +108,8 @@ func _input(event: InputEvent) -> void:
 # Connections                                                                 #
 ###############################################################################
 
-func _on_item_selected(index: int) -> void:
-	match input_type_button.get_item_text(index):
-		INPUT_TYPE_RAW:
-			raw_input_text_edit.visible = true
-			structured_container.visible = false
-		INPUT_TYPE_STRUCTURED:
-			raw_input_text_edit.visible = false
-			_build_structured_container()
-			structured_container.visible = true
+func _on_toggle_pressed(toggle_name: String) -> void:
+	emit_signal("toggle_selected", toggle_name)
 
 func _on_input_button_pressed() -> void:
 	var query_text: String = ""
@@ -195,6 +212,9 @@ func _display_query_results() -> void:
 			var value = ""
 			if r[n] != null:
 				value = str(r[n])
+			
+			value.replace("\n", "\\n")
+			
 			query_results.add_item(value)
 
 ###############################################################################
