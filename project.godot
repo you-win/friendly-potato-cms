@@ -49,6 +49,10 @@ window/size/height=900
 
 enabled=PoolStringArray( "res://addons/godot-sqlite/plugin.cfg" )
 
+[gui]
+
+theme/custom="res://assets/DefaultTheme.tres"
+
 [input]
 
 super={

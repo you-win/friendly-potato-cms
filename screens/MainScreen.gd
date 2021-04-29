@@ -4,14 +4,14 @@ signal toggle_selected(toggle_name)
 
 const VERTICAL_LABEL_INPUT: Resource = preload("res://screens/ui-elements/VerticalLabelInput.tscn")
 
-const INPUT_TYPE_RAW: String = "Raw"
-const INPUT_TYPE_STRUCTURED: String = "Structured"
-
 const RAW_TOGGLE: String = "RawToggle"
 const SELECT_TOGGLE: String = "SelectToggle"
 const INSERT_TOGGLE: String = "InsertToggle"
 const UPDATE_TOGGLE: String = "UpdateToggle"
 const DELETE_TOGGLE: String = "DeleteToggle"
+
+const WHERE_COLUMN: String = "where"
+const ERROR_MESSAGE_EMPTY: String = "not an error"
 
 const INPUT_HISTORY_MAX: int = 100
 
@@ -24,7 +24,8 @@ CREATE TABLE cms (
 	key TEXT NOT NULL,
 	lang TEXT NOT NULL,
 	value TEXT NOT NULL,
-	PRIMARY KEY (key, lang)
+	PRIMARY KEY (key, lang),
+	CHECK (key <> '' and lang <> '' and value <> '')
 )
 """
 const GET_CMS_COLUMNS: String = "PRAGMA table_info(cms)"
@@ -35,12 +36,14 @@ var _last_query_result: Array = []
 
 # Control nodes
 onready var query_results: ItemList = find_node("QueryResults")
+onready var error_display: Label = find_node("ErrorDisplay")
 
-onready var raw_toggle: Toggle = find_node("RawToggle")
-onready var select_toggle: Toggle = find_node("SelectToggle")
-onready var insert_toggle: Toggle = find_node("InsertToggle")
-onready var update_toggle: Toggle = find_node("UpdateToggle")
-onready var delete_toggle: Toggle = find_node("DeleteToggle")
+onready var toggle_container: VBoxContainer = find_node("ToggleContainer")
+onready var raw_toggle: Toggle = find_node(RAW_TOGGLE)
+onready var select_toggle: Toggle = find_node(SELECT_TOGGLE)
+onready var insert_toggle: Toggle = find_node(INSERT_TOGGLE)
+onready var update_toggle: Toggle = find_node(UPDATE_TOGGLE)
+onready var delete_toggle: Toggle = find_node(DELETE_TOGGLE)
 
 onready var raw_input_text_edit: TextEdit = find_node("RawInputTextEdit")
 onready var structured_container: HBoxContainer = find_node("StructuredContainer")
@@ -109,7 +112,17 @@ func _input(event: InputEvent) -> void:
 ###############################################################################
 
 func _on_toggle_pressed(toggle_name: String) -> void:
+	# Unselect other toggles
 	emit_signal("toggle_selected", toggle_name)
+	
+	raw_input_text_edit.visible = false
+	structured_container.visible = false
+	
+	if toggle_name == RAW_TOGGLE:
+		raw_input_text_edit.visible = true
+	else:
+		_build_structured_container(toggle_name)
+		structured_container.visible = true
 
 func _on_input_button_pressed() -> void:
 	var query_text: String = ""
@@ -119,12 +132,62 @@ func _on_input_button_pressed() -> void:
 		_add_to_raw_input_history(query_text)
 		raw_input_text_edit.text = ""
 	else:
-		# TODO fill out structured input logic
-		pass
+		var toggle_name: String = ""
+		for c in toggle_container.get_children():
+			if c.pressed:
+				toggle_name = c.name
+				break
+		
+		var where_text: String = " WHERE "
+		# String
+		var column_names: Array = []
+		# String
+		var column_values: Array = []
+		
+		for c in structured_container.get_children():
+			if c.title == WHERE_COLUMN:
+				if c.get_value().empty():
+					where_text = ""
+				else:
+					where_text += c.get_value()
+			else:
+				column_names.append(c.title)
+				column_values.append(c.get_value())
+		
+		match toggle_name:
+			SELECT_TOGGLE:
+				query_text = "SELECT * FROM cms%s;" % where_text
+			INSERT_TOGGLE:
+				var column_text: String
+				var value_text: String
+				
+				for i in column_names.size():
+					column_text += "%s" % column_names[i]
+					value_text += '"%s"' % column_values[i]
+					if i < column_names.size() - 1:
+						column_text += ", "
+						value_text += ", "
+				
+				query_text = "INSERT INTO cms (%s) values (%s);" % [column_text, value_text]
+			UPDATE_TOGGLE:
+				var set_text: String
+				
+				for i in column_names.size():
+					set_text += '%s = "%s"' % [column_names[i], column_values[i]]
+					if i < column_values.size() - 1:
+						set_text += ", "
+				
+				query_text = "UPDATE cms SET %s%s;" % [set_text, where_text]
+			DELETE_TOGGLE:
+				query_text = "DELETE FROM cms%s;" % where_text
 	
 	db.query(query_text)
 	
 	_last_query_result = db.query_result
+	if db.error_message == ERROR_MESSAGE_EMPTY:
+		error_display.text = "Success"
+	else:
+		error_display.text = db.error_message
 	
 	_display_query_results()
 
@@ -177,14 +240,30 @@ func _get_column_names() -> Array:
 	
 	return result
 
-func _build_structured_container() -> void:
+func _build_structured_container(toggle_name: String) -> void:
 	for c in structured_container.get_children():
 		c.queue_free()
 	
 	yield(get_tree(), "idle_frame")
 	
-	var column_names: Array = _get_column_names()
-	for r in column_names:
+	match toggle_name:
+		SELECT_TOGGLE:
+			_generate_where_column_node()
+		INSERT_TOGGLE:
+			_generate_column_nodes()
+		UPDATE_TOGGLE:
+			_generate_where_column_node()
+			_generate_column_nodes()
+		DELETE_TOGGLE:
+			_generate_where_column_node()
+
+func _generate_where_column_node() -> void:
+	var vli: VerticalLabelInput = VERTICAL_LABEL_INPUT.instance()
+	vli.title = WHERE_COLUMN
+	structured_container.call_deferred("add_child", vli)
+
+func _generate_column_nodes() -> void:
+	for r in _get_column_names():
 		var vli: VerticalLabelInput = VERTICAL_LABEL_INPUT.instance()
 		vli.title = r
 		structured_container.call_deferred("add_child", vli)

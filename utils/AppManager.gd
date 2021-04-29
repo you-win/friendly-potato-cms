@@ -9,7 +9,11 @@ onready var sdu: SaveDataUtil = SaveDataUtil.new()
 ###############################################################################
 
 func _ready() -> void:
-	pass
+	var default_theme: Theme = load("res://assets/DefaultTheme.tres")
+	var font = DynamicFont.new()
+	font.font_data = load("c://Windows/Fonts/arial.ttf")
+#	font.font_data = load("res://assets/arial-unicode-ms.ttf")
+	default_theme.default_font = font
 
 ###############################################################################
 # Connections                                                                 #

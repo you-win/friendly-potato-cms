@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=2]
+[gd_scene load_steps=4 format=2]
 
 [ext_resource path="res://screens/MainScreen.gd" type="Script" id=1]
 [ext_resource path="res://screens/ui-elements/Toggle.tscn" type="PackedScene" id=2]
+[ext_resource path="res://assets/DefaultTheme.tres" type="Theme" id=3]
 
 [node name="MainScreen" type="Node2D"]
 script = ExtResource( 1 )
@@ -40,9 +41,13 @@ __meta__ = {
 "_edit_use_anchors_": false
 }
 
-[node name="QueryResults" type="ItemList" parent="CanvasLayer/VBoxContainer/OutputContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer/VBoxContainer/OutputContainer"]
 margin_right = 1580.0
 margin_bottom = 654.0
+
+[node name="QueryResults" type="ItemList" parent="CanvasLayer/VBoxContainer/OutputContainer/VBoxContainer"]
+margin_right = 1580.0
+margin_bottom = 636.0
 focus_mode = 0
 size_flags_horizontal = 3
 size_flags_vertical = 3
@@ -50,6 +55,11 @@ select_mode = 1
 allow_rmb_select = true
 auto_height = true
 same_column_width = true
+
+[node name="ErrorDisplay" type="Label" parent="CanvasLayer/VBoxContainer/OutputContainer/VBoxContainer"]
+margin_top = 640.0
+margin_right = 1580.0
+margin_bottom = 654.0
 
 [node name="InputContainer" type="MarginContainer" parent="CanvasLayer/VBoxContainer"]
 margin_top = 664.0
@@ -73,6 +83,7 @@ margin_bottom = 216.0
 
 [node name="RawToggle" parent="CanvasLayer/VBoxContainer/InputContainer/HBoxContainer/ToggleContainer" instance=ExtResource( 2 )]
 margin_right = 126.0
+pressed = true
 text = "Raw"
 
 [node name="SelectToggle" parent="CanvasLayer/VBoxContainer/InputContainer/HBoxContainer/ToggleContainer" instance=ExtResource( 2 )]
@@ -105,12 +116,13 @@ margin_right = 1444.0
 margin_bottom = 216.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
+theme = ExtResource( 3 )
 
 [node name="StructuredContainer" type="HBoxContainer" parent="CanvasLayer/VBoxContainer/InputContainer/HBoxContainer"]
 visible = false
-margin_left = 792.0
-margin_right = 1504.0
-margin_bottom = 174.0
+margin_left = 820.0
+margin_right = 1507.0
+margin_bottom = 216.0
 size_flags_horizontal = 3
 size_flags_vertical = 3
 

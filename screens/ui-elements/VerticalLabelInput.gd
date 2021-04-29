@@ -25,4 +25,5 @@ func _ready() -> void:
 # Public functions                                                            #
 ###############################################################################
 
-
+func get_value() -> String:
+	return text_edit.text
