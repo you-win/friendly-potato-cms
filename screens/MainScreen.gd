@@ -79,7 +79,7 @@ func _ready() -> void:
 	find_node("ExportQueryButton").connect("pressed", self, "_on_export_query")
 	
 	if not OS.is_debug_build():
-		db_path = OS.get_executable_path().get_base_dir()
+		db_path = OS.get_executable_path().get_base_dir() + "/"
 	else:
 		db_path = "res://export/"
 	
