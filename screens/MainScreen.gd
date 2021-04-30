@@ -24,6 +24,7 @@ CREATE TABLE cms (
 	key TEXT NOT NULL,
 	lang TEXT NOT NULL,
 	value TEXT NOT NULL,
+	notes TEXT,
 	PRIMARY KEY (key, lang),
 	CHECK (key <> '' and lang <> '' and value <> '')
 )
@@ -55,9 +56,6 @@ var _is_super_pressed: bool = false
 var _raw_input_history_pointer: int = 0
 var _raw_input_history: Array = Array()
 
-var _structured_input_history_pointer: int = 0
-var _structured_input_history: Array = Array()
-
 ###############################################################################
 # Builtin functions                                                           #
 ###############################################################################
@@ -76,6 +74,9 @@ func _ready() -> void:
 	delete_toggle.connect("self_pressed", self, "_on_toggle_pressed")
 	
 	input_button.connect("pressed", self, "_on_input_button_pressed")
+	
+	find_node("ExportAllButton").connect("pressed", self, "_on_export_all")
+	find_node("ExportQueryButton").connect("pressed", self, "_on_export_query")
 	
 	if not OS.is_debug_build():
 		db_path = OS.get_executable_path().get_base_dir()
@@ -129,7 +130,6 @@ func _on_input_button_pressed() -> void:
 	
 	if raw_input_text_edit.visible:
 		query_text = raw_input_text_edit.text
-		_add_to_raw_input_history(query_text)
 		raw_input_text_edit.text = ""
 	else:
 		var toggle_name: String = ""
@@ -173,6 +173,8 @@ func _on_input_button_pressed() -> void:
 				var set_text: String
 				
 				for i in column_names.size():
+					if column_values[i].empty():
+						continue
 					set_text += '%s = "%s"' % [column_names[i], column_values[i]]
 					if i < column_values.size() - 1:
 						set_text += ", "
@@ -182,6 +184,7 @@ func _on_input_button_pressed() -> void:
 				query_text = "DELETE FROM cms%s;" % where_text
 	
 	db.query(query_text)
+	_add_to_raw_input_history(query_text)
 	
 	_last_query_result = db.query_result
 	if db.error_message == ERROR_MESSAGE_EMPTY:
@@ -191,11 +194,65 @@ func _on_input_button_pressed() -> void:
 	
 	_display_query_results()
 
+func _on_export_all() -> void:
+	"""
+	output
+	{
+		"lang": {
+			"key": "value"
+		}
+	}
+	"""
+	db.query("SELECT * FROM cms;")
+	
+	if db.query_result.size() < 1:
+		error_display.text = "No data to export in 'cms' table"
+		return
+	
+	var result: Dictionary = _generate_lean_json(db.query_result)
+	
+	var save_file: File = File.new()
+	save_file.open("%s%s.json" % [db_path, "export_all"], File.WRITE)
+	
+	save_file.store_string(to_json(result))
+	
+	save_file.close()
+	
+	error_display.text = "DB exported as lean json"
+
+func _on_export_query() -> void:
+	"""
+	output
+	{
+		"lang": {
+			"key": "value"
+		}
+	}
+	"""
+	if _last_query_result.size() < 1:
+		error_display.text = "No data to export from current query"
+		return
+	
+	var result: Dictionary = _generate_lean_json(db.query_result)
+	
+	var save_file: File = File.new()
+	var cdt: Dictionary = OS.get_datetime()
+	save_file.open('%s%s-%s-%s-%s-%s-%s.json' % [db_path, cdt.year, cdt.month, cdt.day, cdt.hour, cdt.minute, cdt.second], File.WRITE)
+	
+	save_file.store_string(to_json(result))
+	
+	save_file.close()
+	
+	error_display.text = "Current query exported as lean json"
+
 ###############################################################################
 # Private functions                                                           #
 ###############################################################################
 
 func _get_previous_input_history() -> void:
+	"""
+	Input history is only supported for raw queries
+	"""
 	if raw_input_text_edit.visible:
 		# Return early if there is no history
 		if _raw_input_history_pointer < 0:
@@ -205,11 +262,11 @@ func _get_previous_input_history() -> void:
 			_raw_input_history_pointer -= 1
 		
 		raw_input_text_edit.text = _raw_input_history[_raw_input_history_pointer]
-	else:
-		# TODO fill out structured input logic
-		pass
 
 func _get_next_input_history() -> void:
+	"""
+	Input history is only supported for raw queries
+	"""
 	var result: String = ""
 	
 	if raw_input_text_edit.visible:
@@ -219,9 +276,6 @@ func _get_next_input_history() -> void:
 		
 		_raw_input_history_pointer += 1
 		raw_input_text_edit.text = _raw_input_history[_raw_input_history_pointer]
-	else:
-		# TODO fill out structured input logic
-		pass
 
 func _add_to_raw_input_history(text: String) -> void:
 	_raw_input_history.push_back(text)
@@ -256,16 +310,26 @@ func _build_structured_container(toggle_name: String) -> void:
 			_generate_column_nodes()
 		DELETE_TOGGLE:
 			_generate_where_column_node()
+	
+	yield(get_tree(), "idle_frame")
+	
+	for i in structured_container.get_child_count():
+		var next_node = i + 1
+		if next_node > structured_container.get_child_count() - 1:
+			next_node = 0
+		(structured_container.get_child(i) as VerticalLabelInput).focus_next = (structured_container.get_child(next_node) as VerticalLabelInput).text_edit.get_path()
 
 func _generate_where_column_node() -> void:
 	var vli: VerticalLabelInput = VERTICAL_LABEL_INPUT.instance()
 	vli.title = WHERE_COLUMN
+	vli.name = WHERE_COLUMN
 	structured_container.call_deferred("add_child", vli)
 
 func _generate_column_nodes() -> void:
 	for r in _get_column_names():
 		var vli: VerticalLabelInput = VERTICAL_LABEL_INPUT.instance()
 		vli.title = r
+		vli.name = r
 		structured_container.call_deferred("add_child", vli)
 
 func _display_query_results() -> void:
@@ -295,6 +359,18 @@ func _display_query_results() -> void:
 			value.replace("\n", "\\n")
 			
 			query_results.add_item(value)
+
+func _generate_lean_json(db_query_result: Array) -> Dictionary:
+	var result: Dictionary = {}
+	
+	for r in db_query_result:
+		var lang: String = r["lang"]
+		if not result.has(lang):
+			result[lang] = {}
+		
+		result[lang][r["key"]] = r["value"]
+	
+	return result
 
 ###############################################################################
 # Public functions                                                            #

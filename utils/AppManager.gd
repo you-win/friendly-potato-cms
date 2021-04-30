@@ -10,9 +10,16 @@ onready var sdu: SaveDataUtil = SaveDataUtil.new()
 
 func _ready() -> void:
 	var default_theme: Theme = load("res://assets/DefaultTheme.tres")
-	var font = DynamicFont.new()
+	var font := DynamicFont.new()
 	font.font_data = load("c://Windows/Fonts/arial.ttf")
-#	font.font_data = load("res://assets/arial-unicode-ms.ttf")
+	
+	var font_fallbacks: Array = ["c://Windows/Fonts/msyh.ttc"]
+	for f in font_fallbacks:
+		var dfd := DynamicFontData.new()
+		dfd.font_path = f
+		
+		font.add_fallback(dfd)
+	
 	default_theme.default_font = font
 
 ###############################################################################
